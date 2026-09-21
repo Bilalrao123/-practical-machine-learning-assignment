@@ -1,0 +1,172 @@
+---
+title: 'Practical Machine Learning: Prediction Assignment'
+output: html_document
+---
+```{r}
+training_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_url  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(training_url, "pml-training.csv", mode = "wb")
+download.file(testing_url, "pml-testing.csv", mode = "wb")
+
+training <- read.csv("pml-training.csv", na.strings = c("", "NA"))
+testing <- read.csv("pml-testing.csv", na.strings = c("", "NA"))
+
+dim(training)
+dim(testing)
+```
+```{r}
+library(caret)
+library(randomForest)
+
+# Remove columns with mostly missing values
+training <- training[, colSums(is.na(training)) < 0.9 * nrow(training)]
+
+testing <- testing[, names(training)[names(training) != "classe"]]
+
+# Remove identification/time-window variables
+remove_cols <- c(
+  "X",
+  "user_name",
+  "raw_timestamp_part_1",
+  "raw_timestamp_part_2",
+  "cvtd_timestamp",
+  "new_window",
+  "num_window"
+)
+
+remove_cols <- intersect(remove_cols, names(training))
+
+training <- training[, !names(training) %in% remove_cols]
+testing <- testing[, !names(testing) %in% remove_cols]
+```
+
+```{r}
+set.seed(123)
+
+inTrain <- createDataPartition(
+  training$classe,
+  p = 0.75,
+  list = FALSE
+)
+
+trainData <- training[inTrain, ]
+validData <- training[-inTrain, ]
+
+dim(trainData)
+dim(validData)
+```
+ 
+```{r}
+# Make sure the outcome is a factor
+trainData$classe <- as.factor(trainData$classe)
+
+# Remove rows containing missing values
+trainData <- na.omit(trainData)
+validData <- na.omit(validData)
+
+# Train Random Forest
+model <- randomForest(
+  classe ~ .,
+  data = trainData,
+  ntree = 100
+)
+
+model
+```
+ 
+```{r}
+# Make predictions on the validation data
+validation_prediction <- predict(model, newdata = validData)
+
+# Make sure both are factors with the same levels
+validation_prediction <- factor(
+  validation_prediction,
+  levels = c("A", "B", "C", "D", "E")
+)
+
+validData$classe <- factor(
+  validData$classe,
+  levels = c("A", "B", "C", "D", "E")
+)
+
+confusionMatrix(
+  data = validation_prediction,
+  reference = validData$classe
+)
+```
+ 
+```{r}
+# Predict the 20 test cases
+test_prediction <- predict(model, newdata = testing)
+
+# Display the predictions
+test_prediction
+```
+
+## Results
+
+The Random Forest model was evaluated using the validation dataset. The
+validation accuracy was calculated and used to estimate the out-of-sample
+error. The trained model was then applied to the 20 observations in the
+test dataset.
+
+The predictions for the 20 test cases were generated using the final model.
+
+```{r}
+# Create validation predictions
+validation_prediction <- predict(model, newdata = validData)
+
+# Make sure the factors have the same levels
+validation_prediction <- factor(
+  validation_prediction,
+  levels = c("A", "B", "C", "D", "E")
+)
+
+validData$classe <- factor(
+  validData$classe,
+  levels = c("A", "B", "C", "D", "E")
+)
+
+# Calculate accuracy and out-of-sample error
+accuracy <- mean(validation_prediction == validData$classe)
+out_of_sample_error <- 1 - accuracy
+
+accuracy
+out_of_sample_error
+```
+## Introduction
+
+The goal of this project is to predict the manner in which participants
+performed barbell lifts using accelerometer measurements. The response
+variable is the classe variable, which contains five exercise categories.
+
+## Data Preparation
+
+The training data were divided into training and validation sets. Variables
+with large amounts of missing data and identification-related variables were
+removed before modeling.
+
+## Model
+
+A Random Forest classification model was used to predict the classe variable.
+The model was trained using the training portion of the dataset.
+
+## Cross Validation
+
+The training data were divided into a training set and a validation set.
+The validation set was used to estimate how well the model performs on
+previously unseen observations.
+
+## Results
+
+The Random Forest model achieved a validation accuracy of 99.59%.
+The estimated out-of-sample error was approximately 0.41%.
+
+## Test Set Predictions
+
+The final model was applied to the 20 observations in the test dataset.
+The resulting predictions were submitted to the Course Project Prediction
+Quiz.
+ 
+ 
